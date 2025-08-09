@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
+    newChatButton = document.getElementById('newChatButton');
     
     setupEventListeners();
     createNewSession();
@@ -29,6 +30,8 @@ function setupEventListeners() {
         if (e.key === 'Enter') sendMessage();
     });
     
+    // New Chat button
+    newChatButton.addEventListener('click', handleNewChat);
     
     // Suggested questions
     document.querySelectorAll('.suggested-item').forEach(button => {
@@ -122,10 +125,28 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        // Process sources to create clickable links
+        const processedSources = sources.map(source => {
+            // Check if source has embedded link (format: "Course - Lesson X|http://link")
+            if (source.includes('|')) {
+                const parts = source.split('|');
+                const displayText = parts[0].trim();
+                const link = parts[1].trim();
+                
+                // Create a clickable link button
+                return `<a href="${link}" target="_blank" rel="noopener noreferrer" class="source-link-button">${escapeHtml(displayText)}</a>`;
+            } else {
+                // No link available, just show plain text as a button-like element
+                return `<span class="source-text-button">${escapeHtml(source)}</span>`;
+            }
+        });
+        
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">
+                    ${processedSources.join('')}
+                </div>
             </details>
         `;
     }
@@ -150,6 +171,32 @@ async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+}
+
+// Handle New Chat button click
+async function handleNewChat() {
+    // If there's a current session, clear it on the backend first
+    if (currentSessionId) {
+        try {
+            await fetch(`${API_URL}/session/clear`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_id: currentSessionId
+                })
+            });
+        } catch (error) {
+            console.error('Error clearing session:', error);
+        }
+    }
+    
+    // Clear the current conversation in the chat window and reset session
+    await createNewSession();
+    
+    // Focus on input for user convenience
+    chatInput.focus();
 }
 
 // Load course statistics
